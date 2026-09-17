@@ -231,6 +231,13 @@ function clearHistory() {
   renderHistory();
 }
 
+function deleteHistoryEntry(index) {
+  if (index < 0 || index >= history.length) return;
+  history.splice(index, 1);
+  saveHistory();
+  renderHistory();
+}
+
 function renderHistory() {
   ui.historyList.replaceChildren();
 
@@ -250,8 +257,17 @@ function renderHistory() {
 
     entry.append(expression, result);
 
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'entry-delete';
+    deleteBtn.type = 'button';
+    deleteBtn.dataset.index = String(index);
+    deleteBtn.title = 'Delete this entry';
+    deleteBtn.setAttribute('aria-label', 'Delete this entry');
+    deleteBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>';
+
     const row = document.createElement('li');
-    row.append(entry);
+    row.className = 'entry-row';
+    row.append(entry, deleteBtn);
     ui.historyList.append(row);
   }
 
@@ -267,8 +283,15 @@ function toggleHistory(open) {
   ui.historyToggle.setAttribute('aria-pressed', String(show));
 }
 
-/* Reusing a past result drops it straight into the display. */
+/* Deleting a single entry, or reusing a past result by dropping it
+   straight into the display — whichever the click targeted. */
 ui.historyList.addEventListener('click', (event) => {
+  const deleteBtn = event.target.closest('.entry-delete');
+  if (deleteBtn) {
+    deleteHistoryEntry(Number(deleteBtn.dataset.index));
+    return;
+  }
+
   const entry = event.target.closest('.entry');
   if (!entry) return;
 

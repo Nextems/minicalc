@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MiniCalc</title>
+<style>
+  :root {
+    --bg: #15171c;
+    --surface: #1e2128;
+    --key: #262a33;
+    --key-lift: #323845;
+    --text: #eceff4;
+    --muted: #767e8d;
+    --accent: #e3a04a;
+    --accent-lift: #f0b264;
+    --accent-ink: #1a1207;
+    --radius-window: 14px;
+    --radius-key: 11px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    color: var(--text);
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .window {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bg);
+    border: 1px solid #2b2f38;
+    border-radius: var(--radius-window);
+    overflow: hidden;
+  }
+
+  /* ---------- title bar ---------- */
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 8px 0 14px;
+    flex: none;
+  }
+
+  .bar-title {
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    margin-right: auto;
+    pointer-events: none;
+  }
+
+  .bar-btn {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .bar-btn:hover { background: var(--key); color: var(--text); }
+  .bar-btn[aria-pressed="true"] { color: var(--accent); }
+  .bar-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  #close:hover { background: #a63b43; color: #fff; }
+
+  /* ---------- display ---------- */
+  .display {
+    flex: none;
+    padding: 6px 16px 14px;
+    text-align: right;
+    background: var(--bg);
+  }
+
+  .expression {
+    height: 16px;
+    font-size: 12.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .result {
+    margin-top: 4px;
+    font-size: 38px;
+    font-weight: 300;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .result.compact { font-size: 27px; }
+  .result.error { font-size: 15px; color: var(--accent); font-weight: 400; }
+
+  /* ---------- keypad ---------- */
+  .keypad {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 1fr;
+    gap: 7px;
+    padding: 0 12px 12px;
+  }
+
+  .key {
+    border: none;
+    border-radius: var(--radius-key);
+    background: var(--key);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 19px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: background 90ms ease, transform 90ms ease;
+  }
+
+  .key:hover { background: var(--key-lift); }
+  .key:active, .key.flash { transform: scale(0.95); background: var(--key-lift); }
+  .key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .key.fn { color: var(--muted); font-size: 17px; }
+  .key.fn:hover { color: var(--text); }
+
+  .key.op { color: var(--accent); font-size: 21px; }
+
+  .key.equals { background: var(--accent); color: var(--accent-ink); font-weight: 500; }
+  .key.equals:hover { background: var(--accent-lift); }
+  .key.equals:active, .key.equals.flash { background: var(--accent-lift); }
+
+  /* ---------- history ---------- */
+  .history {
+    position: absolute;
+    inset: 34px 0 0 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    z-index: 2;
+  }
+
+  .history[hidden] { display: none; }
+
+  .history-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 2px 14px 10px;
+    font-size: 12.5px;
+    color: var(--muted);
+    flex: none;
+  }
+
+  .link-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+  }
+
+  .link-btn:hover { color: var(--accent-lift); }
+  .link-btn:disabled { color: #4a505c; cursor: default; }
+
+  .history-list {
+    list-style: none;
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 8px 10px;
+  }
+
+  .history-list::-webkit-scrollbar { width: 6px; }
+  .history-list::-webkit-scrollbar-thumb {
+    background: #333844;
+    border-radius: 3px;
+  }
+
+  .entry {
+    width: 100%;
+    display: block;
+    text-align: right;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    padding: 7px 6px;
+    font: inherit;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .entry:hover { background: var(--surface); }
+  .entry:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .entry-expression {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .entry-result {
+    display: block;
+    font-size: 18px;
+    font-weight: 300;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .history-empty {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding: 0 34px 24px;
+    text-align: center;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  .history-empty[hidden] { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .key, .bar-btn { transition: none; }
+    .key:active, .key.flash { transform: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="window">
+    <header class="bar" data-tauri-drag-region>
+      <span class="bar-title" data-tauri-drag-region>MiniCalc</span>
+
+      <button id="history-toggle" class="bar-btn" aria-pressed="false" aria-controls="history" title="History">
+        <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 4v3.5h3.5"/><path d="M12 8v4.5l3 1.8"/></svg>
+      </button>
+
+      <button id="pin" class="bar-btn" aria-pressed="true" title="Stay on top">
+        <svg viewBox="0 0 24 24"><path d="M9 4h6l-1 6 4 3H6l4-3z"/><path d="M12 13v7"/></svg>
+      </button>
+
+      <button id="minimize" class="bar-btn" title="Minimize">
+        <svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+      </button>
+
+      <button id="close" class="bar-btn" title="Close">
+        <svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>
+      </button>
+    </header>
+
+    <section class="display">
+      <div class="expression" id="expression"></div>
+      <div class="result" id="result">0</div>
+    </section>
+
+    <div class="keypad">
+      <button class="key fn" data-action="clear">AC</button>
+      <button class="key fn" data-action="backspace">⌫</button>
+      <button class="key fn" data-action="percent">%</button>
+      <button class="key op" data-operator="÷">÷</button>
+
+      <button class="key" data-digit="7">7</button>
+      <button class="key" data-digit="8">8</button>
+      <button class="key" data-digit="9">9</button>
+      <button class="key op" data-operator="×">×</button>
+
+      <button class="key" data-digit="4">4</button>
+      <button class="key" data-digit="5">5</button>
+      <button class="key" data-digit="6">6</button>
+      <button class="key op" data-operator="−">−</button>
+
+      <button class="key" data-digit="1">1</button>
+      <button class="key" data-digit="2">2</button>
+      <button class="key" data-digit="3">3</button>
+      <button class="key op" data-operator="+">+</button>
+
+      <button class="key fn" data-action="negate">±</button>
+      <button class="key" data-digit="0">0</button>
+      <button class="key" data-action="decimal">.</button>
+      <button class="key equals" data-action="equals">=</button>
+    </div>
+
+    <section class="history" id="history" hidden>
+      <div class="history-head">
+        <span>History</span>
+        <button class="link-btn" id="clear-history" disabled>Clear</button>
+      </div>
+      <ul class="history-list" id="history-list"></ul>
+      <p class="history-empty" id="history-empty">Results appear here once you press =. Tap one to reuse it.</p>
+    </section>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
